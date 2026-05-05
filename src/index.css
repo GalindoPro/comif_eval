@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+}
+
+#root {
+  width: 100%;
+  max-width: 100%;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes zoomIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInTop {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-in.fade-in { animation: fadeIn 0.5s ease-out both; }
+.animate-in.zoom-in { animation: zoomIn 0.3s ease-out both; }
+.animate-in.slide-in-from-right { animation: slideInRight 0.3s ease-out both; }
+.animate-in.slide-in-from-top-2 { animation: slideInTop 0.3s ease-out both; }
+.animate-in.duration-300 { animation-duration: 0.3s; }
+.animate-in.duration-500 { animation-duration: 0.5s; }
+
+@media print {
+  .print\:hidden { display: none !important; }
+  .print\:bg-white { background: white !important; }
+  .print\:shadow-none { box-shadow: none !important; }
+  .print\:border-none { border: none !important; }
+  .print\:p-0 { padding: 0 !important; }
+}
