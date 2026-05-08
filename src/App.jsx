@@ -2,8 +2,11 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   UserCheck, FileText, AlertTriangle, CheckCircle, TrendingUp, ShieldCheck,
   Printer, ChevronRight, ChevronLeft, Search, Users, ArrowRight, BrainCircuit,
-  FileDown, RefreshCcw, Plus, Trash2, XCircle, Undo2, MessageSquareQuote
+  FileDown, RefreshCcw, Plus, Trash2, XCircle, Undo2, MessageSquareQuote,
+  Building2, Phone, Briefcase, MapPin
 } from 'lucide-react';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
 
 const APP_ID = "comif-eval-2024-final-refs-integrated-v19";
 
@@ -192,22 +195,57 @@ const App = () => {
     });
   };
 
-  const exportToWord = () => {
-    const header =
-      "<html xmlns:o='urn:schemas-microsoft-com:office:office' " +
-      "xmlns:w='urn:schemas-microsoft-com:office:word' " +
-      "xmlns='http://www.w3.org/TR/REC-html40'>" +
-      "<head><meta charset='utf-8'><title>Acta de Resolución</title></head><body>";
-    const footer = "</body></html>";
-    const content = document.getElementById('printable-acta').innerHTML;
-    const sourceHTML = header + content + footer;
-    const source = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(sourceHTML);
-    const fileLink = document.createElement("a");
-    document.body.appendChild(fileLink);
-    fileLink.href = source;
-    fileLink.download = `Acta_Riesgo_${aspirant.name.replace(/ /g, '_') || 'Nuevo'}.doc`;
-    fileLink.click();
-    document.body.removeChild(fileLink);
+  const exportToPDF = async () => {
+    const element = document.getElementById('printable-acta');
+    // Save original styles to restore them later
+    const originalStyle = element.style.cssText;
+    
+    // Force some styles for the capture
+    element.style.width = '210mm';
+    element.style.minHeight = '297mm';
+    element.style.margin = '0';
+    element.style.padding = '15mm';
+    element.style.boxShadow = 'none';
+    element.style.border = 'none';
+
+    const canvas = await html2canvas(element, {
+      scale: 3, // Higher scale for better quality
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#ffffff',
+      windowWidth: element.scrollWidth,
+      windowHeight: element.scrollHeight
+    });
+    
+    // Restore original styles
+    element.style.cssText = originalStyle;
+
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const imgWidth = 210;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    
+    // Handle multi-page if necessary
+    let heightLeft = imgHeight;
+    let position = 0;
+    const pageHeight = 297;
+
+    pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+
+    while (heightLeft >= 0) {
+      position = heightLeft - imgHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+    }
+
+    pdf.save(`Acta_Resolucion_${aspirant.name.replace(/ /g, '_') || 'Nuevo'}.pdf`);
   };
 
   return (
@@ -471,50 +509,164 @@ const App = () => {
           {/* STEP 3 — Acta final */}
           {step === 3 && (
             <div className="space-y-6 animate-in zoom-in duration-300">
-              <div id="printable-acta" className="bg-white border-2 border-slate-900 rounded-[3rem] p-8 md:p-12 shadow-sm">
-                <div className="max-w-3xl mx-auto space-y-8 text-slate-900">
-                  <div className="text-center border-b-2 border-slate-900 pb-6">
-                    <h2 className="text-2xl font-black uppercase tracking-tight">Acta de Resolución de Ingreso</h2>
-                    <p className="font-mono text-[9px] uppercase text-slate-500">EXP: {aspirant.id || 'S/N'} | FECHA: {aspirant.date}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-slate-50 p-4 rounded-2xl border-l-4 border-slate-900 shadow-inner">
-                      <p className="text-[10px] font-black uppercase text-slate-400">Aspirante</p>
-                      <h4 className="text-lg font-black uppercase tracking-tight">{aspirant.name || '---'}</h4>
+              <div id="printable-acta" className="bg-white p-6 md:p-8 text-slate-900 font-serif leading-tight" style={{ width: '210mm', minHeight: '297mm', margin: '0 auto' }}>
+                <div className="space-y-4">
+                  {/* Header Institucional */}
+                  <div className="flex justify-between items-start border-b-2 border-slate-900 pb-3">
+                    <div className="space-y-0.5">
+                      <h2 className="text-2xl font-black uppercase tracking-tighter text-slate-900 leading-none">COMIF, R.L.</h2>
+                      <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-slate-500">Cooperativa de Ahorro y Crédito Integral</p>
+                      <p className="text-[8px] font-medium text-slate-400 italic">"Al servicio de nuestra comunidad"</p>
                     </div>
-                    <div className="bg-slate-50 p-4 rounded-2xl border-l-4 border-slate-900 text-center shadow-inner">
-                      <p className="text-[10px] font-black uppercase text-slate-400">Índice Final</p>
-                      <h4 className="text-3xl font-black text-blue-600 tabular-nums">{finalIS.toFixed(2)}</h4>
+                    <div className="text-right space-y-0.5">
+                      <div className="bg-slate-900 text-white px-3 py-0.5 text-[9px] font-black uppercase tracking-widest rounded-sm">
+                        Acta de Resolución
+                      </div>
+                      <p className="font-mono text-[8px] uppercase font-bold pt-1">EXP: {aspirant.id || '---'}</p>
+                      <p className="font-mono text-[8px] uppercase font-bold">FECHA: {aspirant.date}</p>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <h5 className="text-[10px] font-black uppercase tracking-widest border-b border-slate-200 pb-1 flex items-center gap-2">
-                      <BrainCircuit size={12} /> Considerandos Técnicos y Diligencias
+                  {/* Título Principal */}
+                  <div className="text-center py-2">
+                    <h3 className="text-lg font-black uppercase underline underline-offset-4 decoration-2 tracking-widest">Resolución de Ingreso y Admisión</h3>
+                  </div>
+
+                  {/* Datos del Aspirante */}
+                  <section className="space-y-1">
+                    <h5 className="text-[10px] font-black uppercase tracking-widest border-b border-slate-200 pb-0.5 flex items-center gap-2">
+                      <UserCheck size={12} className="text-slate-500" /> I. Información del Aspirante
                     </h5>
-                    <div className="p-6 bg-slate-50 rounded-2xl text-[11px] whitespace-pre-wrap leading-relaxed italic border border-slate-100 text-slate-700 shadow-inner">
-                      {autoReport}
+                    <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-sm border border-slate-100">
+                      <div>
+                        <p className="text-[8px] font-black uppercase text-slate-400">Nombre Completo</p>
+                        <p className="text-xs font-bold uppercase">{aspirant.name || '---'}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[8px] font-black uppercase text-slate-400">Resultado de Idoneidad (IS)</p>
+                        <p className="text-xl font-black text-slate-900">{finalIS.toFixed(2)} / 5.00</p>
+                      </div>
                     </div>
-                  </div>
+                  </section>
 
-                  <div className="space-y-2">
-                    <h5 className="text-[10px] font-black uppercase tracking-widest border-b border-slate-200 pb-1 flex items-center gap-2">
-                      <UserCheck size={12} /> Apreciación General del Auditor
+                  {/* Considerandos Técnicos */}
+                  <section className="space-y-1">
+                    <h5 className="text-[10px] font-black uppercase tracking-widest border-b border-slate-200 pb-0.5 flex items-center gap-2">
+                      <BrainCircuit size={12} className="text-slate-500" /> II. Considerandos Técnicos y Análisis de Riesgo
                     </h5>
-                    <div className="p-6 bg-blue-50/30 rounded-2xl text-sm font-bold whitespace-pre-wrap leading-relaxed border-2 border-blue-50 text-blue-900 shadow-inner">
-                      {auditorAppreciation}
+                    <div className="text-[9px] space-y-2 text-justify leading-snug">
+                      <p>
+                        Tras la aplicación de la Matriz de Inteligencia Social v19.0, se ha evaluado el perfil del aspirante considerando su trayectoria laboral, arraigo comunitario, perfil ético-financiero y relación con avalistas.
+                      </p>
+                      <div className="bg-slate-50 border-l-4 border-slate-900 p-3 font-bold text-slate-800 italic">
+                        {autoReport.split('DILIGENCIA DE DATOS RECOPILADOS:')[0].replace('ANÁLISIS DE RIESGO OBJETIVO:', '').trim()}
+                      </div>
+                    </div>
+                  </section>
+
+                  {/* Diligencias de Campo */}
+                  <section className="space-y-1">
+                    <h5 className="text-[10px] font-black uppercase tracking-widest border-b border-slate-200 pb-0.5 flex items-center gap-2">
+                      <Briefcase size={12} className="text-slate-500" /> III. Diligencia de Datos y Referencias Verificadas
+                    </h5>
+                    <div className="overflow-hidden border border-slate-200 rounded-sm">
+                      <table className="w-full text-[8px] text-left border-collapse">
+                        <thead>
+                          <tr className="bg-slate-100 uppercase font-black text-slate-600">
+                            <th className="p-1.5 border-b border-slate-200">Tipo de Referencia / Entidad</th>
+                            <th className="p-1.5 border-b border-slate-200">Detalles de Contacto</th>
+                            <th className="p-1.5 border-b border-slate-200">Información Adicional</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {QUESTIONS_DB.filter(q => q.refLabel).map(q => {
+                            const data = refs[q.id];
+                            const isNoConsta = noConsta[q.id];
+                            if (isNoConsta) return (
+                              <tr key={q.id} style={{ pageBreakInside: 'avoid' }}>
+                                <td className="p-1 font-bold uppercase">{q.refLabel}</td>
+                                <td colSpan="2" className="p-1 text-red-500 italic">No consta / Información no disponible</td>
+                              </tr>
+                            );
+                            
+                            const formatData = (item) => {
+                              if (q.refType === 'empresa') return {
+                                main: item.empresa || '---',
+                                contact: `${item.contacto || '---'} (${item.cargo || '---'})`,
+                                tel: item.telefono || '---'
+                              };
+                              if (q.refType === 'contacto') return {
+                                main: item.nombre || '---',
+                                contact: `Relación: ${item.relacion || '---'}`,
+                                tel: item.telefono || '---'
+                              };
+                              return { main: item || '---', contact: '---', tel: '---' };
+                            };
+
+                            const items = Array.isArray(data) ? data : [data];
+                            return items.map((item, idx) => {
+                              const info = formatData(item);
+                              return (
+                                <tr key={`${q.id}-${idx}`} style={{ pageBreakInside: 'avoid' }}>
+                                  <td className="p-1 font-bold uppercase">{idx === 0 ? q.refLabel : ''} {Array.isArray(data) ? `[Ref ${idx+1}]` : ''}</td>
+                                  <td className="p-1">
+                                    <div className="font-bold">{info.main}</div>
+                                    <div className="text-slate-500">{info.contact}</div>
+                                  </td>
+                                  <td className="p-1">
+                                    <div className="flex items-center gap-1 font-mono"><Phone size={7} /> {info.tel}</div>
+                                  </td>
+                                </tr>
+                              );
+                            });
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="text-[8px] font-bold text-slate-600 italic">
+                      {autoReport.split('CONCLUSIÓN TÉCNICA:')[1] ? `CONCLUSIÓN TÉCNICA: ${autoReport.split('CONCLUSIÓN TÉCNICA:')[1].trim()}` : ''}
+                    </div>
+                  </section>
+
+                  {/* Apreciación del Auditor */}
+                  <section className="space-y-1">
+                    <h5 className="text-[10px] font-black uppercase tracking-widest border-b border-slate-200 pb-0.5 flex items-center gap-2">
+                      <MessageSquareQuote size={12} className="text-slate-500" /> IV. Apreciación General del Auditor
+                    </h5>
+                    <div className="p-3 bg-slate-50 border border-slate-100 text-[10px] font-medium italic text-slate-800 leading-snug min-h-[60px]">
+                      {auditorAppreciation || 'Sin observaciones adicionales registradas.'}
+                    </div>
+                  </section>
+
+                  {/* Dictamen Final */}
+                  <section className="pt-2">
+                    <div className="border-2 border-slate-900 p-3 text-center space-y-1">
+                      <p className="text-[8px] font-black uppercase text-slate-400 tracking-[0.2em]">Dictamen Final de Admisión</p>
+                      <h4 className="text-2xl font-black uppercase tracking-tighter leading-none">{zone.label}</h4>
+                      <div className="h-0.5 w-16 bg-slate-900 mx-auto mt-1"></div>
+                      <p className="text-[9px] font-bold uppercase pt-1 italic text-slate-600 leading-none">{zone.action}</p>
+                    </div>
+                  </section>
+
+                  {/* Firmas */}
+                  <div className="pt-10 grid grid-cols-2 gap-16 text-center">
+                    <div className="space-y-1">
+                      <div className="border-t border-slate-900 pt-1">
+                        <p className="font-black uppercase text-[9px] tracking-widest">{aspirant.evaluator || 'Firma Auditor'}</p>
+                        <p className="text-[7px] font-bold text-slate-400 uppercase">Analista de Riesgos</p>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="border-t border-slate-900 pt-1">
+                        <p className="font-black uppercase text-[9px] tracking-widest">Sello / Comité de Riesgos</p>
+                        <p className="text-[7px] font-bold text-slate-400 uppercase">Dirección de Admisiones</p>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="p-8 border-4 border-slate-900 text-center rounded-[2.5rem] bg-slate-50 shadow-inner relative overflow-hidden">
-                    <p className="text-[10px] font-black uppercase text-slate-400 mb-2">Dictamen de Admisión</p>
-                    <p className="text-4xl font-black uppercase underline decoration-blue-600 decoration-4 underline-offset-4">{zone.label}</p>
-                    <p className="text-[10px] mt-4 font-black opacity-40 uppercase tracking-tighter italic">{zone.action}</p>
-                  </div>
-
-                  <div className="pt-16 grid grid-cols-2 gap-20 text-center">
-                    <div><div className="border-t-2 border-slate-900 pt-2 font-black uppercase text-[9px]">{aspirant.evaluator || 'Firma Auditor'}</div></div>
-                    <div><div className="border-t-2 border-slate-900 pt-2 font-black uppercase text-[9px]">Comité de Riesgos</div></div>
+                  {/* Pie de página del Acta */}
+                  <div className="pt-4 text-center">
+                    <p className="text-[6px] text-slate-400 font-bold uppercase tracking-[0.4em]">Este documento es confidencial y propiedad exclusiva de COMIF, R.L. • v19.0</p>
                   </div>
                 </div>
               </div>
@@ -523,8 +675,8 @@ const App = () => {
                 <button onClick={() => setStep(2)} className="flex-1 min-w-[120px] py-4 text-slate-400 font-black uppercase text-[10px] hover:bg-white rounded-2xl border-2 border-slate-100 transition-all">
                   Editar Informe
                 </button>
-                <button onClick={exportToWord} className="flex-1 min-w-[180px] py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] shadow-lg flex items-center justify-center gap-2 hover:bg-blue-700 transition-all">
-                  <FileDown size={16} /> Guardar Word
+                <button onClick={exportToPDF} className="flex-1 min-w-[180px] py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] shadow-lg flex items-center justify-center gap-2 hover:bg-blue-700 transition-all">
+                  <FileDown size={16} /> Guardar PDF
                 </button>
                 <button onClick={() => window.print()} className="flex-1 min-w-[160px] py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] shadow-lg flex items-center justify-center gap-2 hover:bg-black transition-all">
                   <Printer size={16} /> Imprimir Acta
