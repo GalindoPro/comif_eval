@@ -39,28 +39,93 @@ body {
 .animate-in.duration-500 { animation-duration: 0.5s; }
 
 @media print {
+  /* Reset document and screen layouts to allow normal scrolling/printing flow */
+  html, body, #root {
+    background: white !important;
+    color: black !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Reset outer wrapper heights, paddings, and background attributes */
+  .min-h-screen,
+  .max-w-5xl,
+  main {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    position: static !important;
+  }
+
+  /* Hide headers, progress bars, footers, buttons and control panels */
+  header,
+  footer,
+  .bg-slate-200,
+  button,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Hide screen controls and non-printable elements */
+  #printable-acta ~ *,
+  * ~ #printable-acta {
+    display: none !important;
+  }
+
+  /* Ensure printable area takes normal block layout at full width */
+  #printable-acta {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    position: relative !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 250mm !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: white !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Compact spacing to ensure single page resolution */
+  #printable-acta .space-y-3 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.4rem !important;
+  }
+  #printable-acta .pt-6 {
+    padding-top: 0.75rem !important;
+  }
+  #printable-acta table td, #printable-acta table th {
+    padding-top: 1px !important;
+    padding-bottom: 1px !important;
+  }
+  #printable-acta section {
+    break-inside: avoid !important;
+  }
+
+  /* Keep only the printable container and its children visible */
   body * {
     visibility: hidden;
   }
   #printable-acta, #printable-acta * {
     visibility: visible;
   }
-  #printable-acta {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 210mm !important;
-    height: auto !important;
-    margin: 0 !important;
-    padding: 15mm !important;
-    border: none !important;
-    box-shadow: none !important;
-    background: white !important;
-  }
-  .print\:hidden { display: none !important; }
-  
+
   @page {
-    size: A4;
-    margin: 0;
+    size: portrait;
+    margin: 6mm;
   }
 }
