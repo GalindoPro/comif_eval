@@ -1,63 +1,23 @@
 import { useState, useMemo, useEffect } from 'react';
+import PanelMetricas from './components/PanelMetricas';
+import ActaImprimible from './components/ActaImprimible';
+import { trackEvento, registrarEvaluacion } from './lib/trackEvento';
 import {
   UserCheck, FileText, AlertTriangle, CheckCircle, TrendingUp, ShieldCheck,
   Printer, ChevronRight, ChevronLeft, Search, Users, ArrowRight, BrainCircuit,
   RefreshCcw, Plus, Trash2, XCircle, Undo2, MessageSquareQuote,
-  Phone, Briefcase
+  Phone, Briefcase, Save
 } from 'lucide-react';
 
-const CATEGORIES = [
-  { id: 'laboral',  title: 'I. Trayectoria y Estabilidad Laboral',           weight: 0.15, icon: <TrendingUp  className="w-5 h-5" /> },
-  { id: 'arraigo',  title: 'II. Arraigo Comunitario y Capital Social',        weight: 0.20, icon: <Users        className="w-5 h-5" /> },
-  { id: 'etico',    title: 'III. Perfil Ético-Financiero y Proyectivos',      weight: 0.40, icon: <ShieldCheck  className="w-5 h-5" /> },
-  { id: 'valores',  title: 'IV. Motivación y Valores Cooperativos',           weight: 0.10, icon: <FileText     className="w-5 h-5" /> },
-  { id: 'avales',   title: 'V. Relación con Avalistas y Referencias',         weight: 0.15, icon: <UserCheck    className="w-5 h-5" /> },
-];
-
-const QUESTIONS_DB = [
-  // I. TRAYECTORIA Y ESTABILIDAD LABORAL
-  { id: 1, cat: 'laboral', text: "1. ¿Cuánto tiempo lleva con su negocio propio, siembra o en su empleo actual?", refLabel: "Referencia de Actividad Laboral", refType: 'empresa', options: [{ val: 1, text: "Menos de 6 meses." }, { val: 2, text: "De 6 meses a un año." }, { val: 3, text: "De 1 a 2 años." }, { val: 4, text: "De 2 a 5 años." }, { val: 5, text: "Más de 5 años estables." }] },
-  { id: 2, cat: 'laboral', text: "2. ¿Cuál ha sido el tiempo más largo que ha mantenido el mismo negocio o puesto de trabajo?", refLabel: "Historial de Mayor Permanencia", refType: 'empresa', options: [{ val: 1, text: "Menos de un año." }, { val: 2, text: "Entre 1 y 2 años." }, { val: 3, text: "Entre 2 y 3 años." }, { val: 4, text: "Entre 3 y 5 años." }, { val: 5, text: "Más de 5 años seguidos." }] },
-  { id: 3, cat: 'laboral', text: "3. Con sus proveedores, clientes o jefes anteriores, ¿cómo ha sido su cumplimiento?", refLabel: "Contacto Comercial / Empleador Anterior", refType: 'empresa', options: [{ val: 1, text: "Ha tenido problemas o atrasos seguidos." }, { val: 2, text: "A veces se atrasa u olvida compromisos." }, { val: 3, text: "Cumplimiento normal, a tiempo." }, { val: 4, text: "Muy formal y puntual en sus tratos." }, { val: 5, text: "Excelente recomendación, intachable." }] },
-  { id: 4, cat: 'laboral', text: "4. Cuando las ventas bajan o cambia de actividad, ¿cómo cubre sus gastos familiares?", options: [{ val: 1, text: "Prestamistas de la calle / Diarios." }, { val: 2, text: "Ayuda o remesas de familiares." }, { val: 3, text: "Ahorros guardados en casa o alcancía." }, { val: 4, text: "Fondos de reserva o mercadería guardada." }, { val: 5, text: "Tiene otra entrada de dinero fija." }] },
-  { id: 5, cat: 'laboral', text: "5. ¿Qué planes tiene para su negocio, siembra o trabajo en los próximos dos años?", options: [{ val: 1, text: "No tiene planes fijos o piensa dejarlo." }, { val: 2, text: "Mantenerlo tal como está ahorita." }, { val: 3, text: "Agrandar el negocio o surtir más mercadería." }, { val: 4, text: "Diversificar o abrir otra sucursal en la región." }, { val: 5, text: "Dejar el negocio herencia/estructura sólida." }] },
-  { id: 6, cat: 'laboral', text: "6. Si ha tenido un problema de dinero o mercadería en su trabajo anterior o negocio, ¿cómo lo resolvió?", options: [{ val: 1, text: "No aclara o prefiere no responder." }, { val: 2, text: "Dejó que el problema se enfriara solo." }, { val: 3, text: "Habló de frente y buscó un convenio." }, { val: 4, text: "Asumió la pérdida y pagó de inmediato." }, { val: 5, text: "Buscó mediación legal o comunitaria justa." }] },
-
-  // II. ARRAIGO COMUNITARIO Y CAPITAL SOCIAL
-  { id: 7, cat: 'arraigo', text: "7. ¿Cuántos años lleva de vivir en la misma comunidad, barrio o cantón?", refLabel: "Dirección Exacta de Residencia", refType: 'texto', options: [{ val: 1, text: "Menos de un año (está alquilando o recién llegado)." }, { val: 2, text: "De 1 a 3 años." }, { val: 3, text: "De 3 a 5 años." }, { val: 4, text: "De 5 a 10 años en el sector." }, { val: 5, text: "Más de 10 años o la casa es propia/familiar." }] },
-  { id: 8, cat: 'arraigo', text: "8. ¿Participa en el Cocode, comités de la iglesia, feria u otra organización local?", refLabel: "Entidad o Comité Comunitario", refType: 'empresa', options: [{ val: 1, text: "No participa en nada de la comunidad." }, { val: 2, text: "Asiste solo cuando lo obligan o convocan." }, { val: 3, text: "Apoya con la cuota o colaboración básica." }, { val: 4, text: "Asiste seguido y ayuda a organizar actividades." }, { val: 5, text: "Es líder, directivo o muy activo en el grupo." }] },
-  { id: 9, cat: 'arraigo', text: "9. ¿Qué opinan los vecinos cercanos sobre la honorabilidad de su familia?", refLabel: "Vecino de Referencia de la Comunidad", refType: 'contacto', isMultiple: true, options: [{ val: 1, text: "Casi no le hablan a la vecindad." }, { val: 2, text: "Los conocen poco o superficialmente." }, { val: 3, text: "Trato cordial y educado con todos." }, { val: 4, text: "Familia muy respetada en el sector." }, { val: 5, text: "Son referentes de confianza y buena conducta." }] },
-  { id: 10, cat: 'arraigo', text: "10. Cuando la comunidad organiza trabajos colectivos para mejorar el agua o las calles, ¿usted suele participar o ayudar?", options: [{ val: 1, text: "Nunca colabora ni asiste." }, { val: 2, text: "Solo si le toca pagar multa por faltar." }, { val: 3, text: "Colabora con el trabajo o el dinero que piden." }, { val: 4, text: "Ayuda a coordinar con los vecinos." }, { val: 5, text: "Es de los que impulsa los proyectos del barrio." }] },
-  { id: 11, cat: 'arraigo', text: "11. Si tuviera una emergencia familiar grave en la noche, ¿con qué vecinos cuenta para apoyarse?", refLabel: "Contacto de Apoyo Comunitario Vecinal", refType: 'contacto', isMultiple: true, options: [{ val: 1, text: "No tiene a nadie cerca que lo auxilie." }, { val: 2, text: "Tal vez algún conocido lejano." }, { val: 3, text: "Cuenta con un vecino de total confianza." }, { val: 4, text: "Varios vecinos se solidarizan rápido." }, { val: 5, text: "Tiene una red comunitaria muy unida." }] },
-  { id: 12, cat: 'arraigo', text: "12. En los negocios o favores del vecindario, ¿cómo lo miran los demás?", options: [{ val: 1, text: "Mala paga o esquivo con los favores." }, { val: 2, text: "Le cuesta cumplir o se tarda mucho." }, { val: 3, text: "Cumplidor con lo básico." }, { val: 4, text: "Es muy cabal y de palabra." }, { val: 5, text: "Un ejemplo de rectitud en todo el cantón." }] },
-
-  // III. PERFIL ÉTICO-FINANCIERO Y PROYECTIVOS
-  { id: 13, cat: 'etico', text: "13. Para usted, ¿qué valor tiene empeñar la palabra en un trato de palabra?", options: [{ val: 1, text: "Se la lleva el viento si las cosas cambian." }, { val: 2, text: "Es flexible si hay una buena excusa." }, { val: 3, text: "Vale, pero es mejor tener un papel firmado." }, { val: 4, text: "Es un compromiso moral muy serio." }, { val: 5, text: "La palabra es sagrada, se cumple pase lo que pase." }] },
-  { id: 14, cat: 'etico', text: "14. Si un familiar le pide dinero prestado de urgencia, ¿qué hace usted?", options: [{ val: 1, text: "Saca el dinero sin pensar en sus propios pagos." }, { val: 2, text: "Usa parte de sus ahorros aunque se descomplete." }, { val: 3, text: "Le ayuda buscando otra solución sin tocar sus reservas." }, { val: 4, text: "Apoya con trabajo o víveres, pero no con dinero." }, { val: 5, text: "Explica con respeto que su ahorro no se toca." }] },
-  { id: 15, cat: 'etico', text: "15. ¿Cómo lleva el control de lo que vende, gasta o debe pagar cada mes?", options: [{ val: 1, text: "No lleva ningún control." }, { val: 2, text: "Todo lo calcula al tanteo y de memoria." }, { val: 3, text: "Apunta las cosas en papeles sueltos o calendario." }, { val: 4, text: "Usa un cuaderno o libreta dedicada solo a eso." }, { val: 5, text: "Lleva un libro de cuentas bien ordenado al día." }] },
-  { id: 16, cat: 'etico', text: "16. Cuando recibe su dinero o las ganancias de la cosecha/venta, ¿qué paga primero?", options: [{ val: 1, text: "Los gustos de la familia o gastos del día." }, { val: 2, text: "Lo que vaya saliendo primero sin orden." }, { val: 3, text: "La comida y los servicios de la casa." }, { val: 4, text: "Separa lo del gasto y de una vez lo de sus deudas." }, { val: 5, text: "Pagar sus deudas es lo primerito, antes que todo." }] },
-  { id: 17, cat: 'etico', text: "17. A su criterio, ¿por qué cree que la gente a veces no paga sus créditos?", options: [{ val: 1, text: "Por mala suerte o el destino." }, { val: 2, text: "Porque se les meten emergencias imprevistas." }, { val: 3, text: "Por mala administración del dinero." }, { val: 4, text: "Por descuido o falta de voluntad." }, { val: 5, text: "Por falta de vergüenza y de principios." }] },
-  { id: 18, cat: 'etico', text: "18. ¿Alguna vez ha dejado de asistir a una fiesta o reunión familiar porque necesitaba ahorrar dinero para pagar su cuota?", options: [{ val: 1, text: "No, la familia y los compromisos sociales van primero." }, { val: 2, text: "Solo si me están presionando mucho para pagar." }, { val: 3, text: "A veces, trato de hacer un balance intermedio." }, { val: 4, text: "Sí, prefiero abstenerme de lujos con tal de cumplir." }, { val: 5, text: "Siempre; primero la tranquilidad de no deberle a nadie." }] },
-  { id: 19, cat: 'etico', text: "19. ¿Cómo se siente usted espiritualmente o de ánimo cuando sabe que debe dinero?", options: [{ val: 1, text: "Tranquilo, es normal deber en estos tiempos." }, { val: 2, text: "Un poco incómodo, pero se le pasa." }, { val: 3, text: "Preocupado lo normal para juntar el pisto." }, { val: 4, text: "Con urgencia de pagar para quitarse esa carga." }, { val: 5, text: "No duerme tranquilo; es una pena moral profunda." }] },
-  { id: 20, cat: 'etico', text: "20. Al pedir este préstamo, ¿es para una necesidad urgente o para una inversión de negocio?", options: [{ val: 1, text: "Para salir de otros compromisos y gastos diarios." }, { val: 2, text: "Para un gusto familiar o consumo." }, { val: 3, text: "Un porcentaje para el negocio y otro para consumo." }, { val: 4, text: "Para surtir o capitalizar un negocio que ya funciona." }, { val: 5, text: "Inversión directa en tierra, herramientas o activos productivos." }] },
-  { id: 21, cat: 'etico', text: "21. Si las ventas bajan a la mitad por un par de meses, ¿cuál es su plan para responderle a COMIF?", options: [{ val: 1, text: "Tendría que dejar de pagar mientras se recupera." }, { val: 2, text: "Prestar en otro lado para tapar este hoyo." }, { val: 3, text: "Venir a la cooperativa a dar la cara y buscar un arreglo." }, { val: 4, text: "Vender algún animalito o herramienta del negocio." }, { val: 5, text: "Ajustar al máximo el gasto de comida y usar el fondo de reserva." }] },
-  { id: 22, cat: 'etico', text: "22. Si ha tenido un malentendido con una cuenta o cobro antes, ¿cómo lo solucionó?", options: [{ val: 1, text: "Se enojó y dejó de pagar." }, { val: 2, text: "Pagó de mala gana y con resentimiento." }, { val: 3, text: "Platicó de buena manera hasta aclarar las cuentas." }, { val: 4, text: "Buscó un recibo o prueba para demostrarlo con respeto." }, { val: 5, text: "Actuó con total transparencia y educación hasta resolver." }] },
-
-  // IV. MOTIVACIÓN Y VALORES COOPERATIVOS
-  { id: 23, cat: 'valores', text: "23. ¿Por qué prefiere asociarse a la cooperativa COMIF, R.L. en lugar de ir a un banco grande?", options: [{ val: 1, text: "Porque los bancos no me prestan o piden mucho papel." }, { val: 2, text: "Por las tasas de interés o porque queda más cerca." }, { val: 3, text: "Porque aquí atienden con más confianza y amabilidad." }, { val: 4, text: "Porque conozco a otros asociados de la comunidad." }, { val: 5, text: "Por el principio de ayuda mutua; el pisto se queda en el pueblo." }] },
-  { id: 24, cat: 'valores', text: "24. Además de ahorrar y prestar, ¿de qué otra forma le gustaría apoyar a la cooperativa?", options: [{ val: 1, text: "Solo vengo por el trámite, no tengo tiempo." }, { val: 2, text: "Recomendar la cooperativa con algunos conocidos." }, { val: 3, text: "Asistir a las capacitaciones que den sobre finanzas." }, { val: 4, text: "Apoyar en comisiones o actividades de beneficio social." }, { val: 5, text: "Formar parte de los comités de vigilancia o administración a futuro." }] },
-  { id: 25, cat: 'valores', text: "25. ¿Está dispuesto a asistir puntualmente a las Asambleas Generales de asociados?", options: [{ val: 1, text: "No creo poder asistir por mi trabajo." }, { val: 2, text: "Solo si mandan aviso de que es obligatorio." }, { val: 3, text: "Sí, para cumplir con lo que mandan los estatutos." }, { val: 4, text: "Asistiría con gusto para enterarme de cómo van las cuentas." }, { val: 5, text: "Sí, participando activamente con propuestas y voto consciente." }] },
-  { id: 26, cat: 'valores', text: "26. Si un asociado de la cooperativa se atrasa con su pago, ¿a quiénes cree que afecta?", options: [{ val: 1, text: "Afecta solo al banco o al gerente." }, { val: 2, text: "Es problema de él y sus fiadores." }, { val: 3, text: "Afecta el historial de la sucursal." }, { val: 4, text: "Se pierde el dinero que sirve para prestarle a otros vecinos." }, { val: 5, text: "Es una falta de respeto a la confianza mutua de todos los asociados." }] },
-
-  // V. RELACIÓN CON AVALISTAS Y REFERENCIAS
-  { id: 27, cat: 'avales', text: "27. ¿Cuánto tiempo hace que conoce a sus fiadores o avalistas actuales?", refLabel: "Socio Avalista / Fiador Principal", refType: 'contacto', isMultiple: true, options: [{ val: 1, text: "Menos de un año (o le cobraron por el favor)." }, { val: 2, text: "De 1 a 3 años de conocerse." }, { val: 3, text: "De 3 a 5 años de buena amistad." }, { val: 4, text: "De 5 a 10 años, vecinos de toda la vida." }, { val: 5, text: "Más de 10 años o son parientes muy rectos." }] },
-  { id: 28, cat: 'avales', text: "28. ¿Por qué cree que su fiador aceptó respaldarlo firmando con usted?", options: [{ val: 1, text: "Por compromiso, no le quedó de otra." }, { val: 2, text: "Por hacerme la campaña / Favor de amistad." }, { val: 3, text: "Porque sabe que tengo un trabajo estable o siembra." }, { val: 4, text: "Porque conoce que soy una persona responsable." }, { val: 5, text: "Porque sabe que mi honorabilidad es intachable y no le voy a fallar." }] },
-  { id: 29, cat: 'avales', text: "29. Si usted se atrasara en una cuota y le cobraran a su fiador, ¿cómo se sentiría?", options: [{ val: 1, text: "Para eso firmó, para respaldarme si no tengo." }, { val: 2, text: "Una molestia del momento, ya se le pasará." }, { val: 3, text: "Apenado, trataría de pagarle lo antes posible." }, { val: 4, text: "Con mucha vergüenza familiar y social." }, { val: 5, text: "Como una traición directa a la confianza y al honor de la familia." }] },
-  { id: 30, cat: 'avales', text: "30. ¿Cómo es el historial de pago de sus referencias o de las personas que lo recomiendan?", refLabel: "Referencia Personal Adicional", refType: 'contacto', options: [{ val: 1, text: "Tienen mala fama o deudas vencidas." }, { val: 2, text: "A veces se atrasan pero van saliendo." }, { val: 3, text: "Récord normal, corriente." }, { val: 4, text: "Gente muy cumplida en sus propios compromisos." }, { val: 5, text: "Gente ejemplar y muy respetada en la región." }] }
-];
+import { CATEGORIES, QUESTIONS_DB } from './lib/constants';
 
 const App = () => {
+  const esModoAdmin = new URLSearchParams(window.location.search).get('admin') === 'true';
+
   const [step, setStep] = useState(0);
+  const [guardado, setGuardado] = useState(false);
+  const [guardando, setGuardando] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [aspirant, setAspirant] = useState({
     name: '', id: '', evaluator: '', date: new Date().toLocaleDateString('es-ES')
@@ -177,6 +137,9 @@ const App = () => {
     }, {}));
     setCurrentQIndex(0);
     setAutoReport('');
+    setGuardado(false);
+    setGuardando(false);
+    setSaveError('');
     setStep(0);
   };
 
@@ -229,6 +192,10 @@ const App = () => {
   };
 
 
+
+  if (esModoAdmin) {
+    return <PanelMetricas />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 p-2 md:p-6 font-sans text-slate-900 flex flex-col">
@@ -297,7 +264,7 @@ const App = () => {
                     placeholder="FIRMA EVALUADOR" />
                 </div>
               </div>
-              <button disabled={!aspirant.name.trim() || aspirant.id.length !== 13 || !aspirant.evaluator.trim()} onClick={() => setStep(1)}
+              <button disabled={!aspirant.name.trim() || aspirant.id.length !== 13 || !aspirant.evaluator.trim()} onClick={() => { trackEvento('inicio_evaluacion'); setStep(1); }}
                 className="w-full py-4 bg-[#FFD400] hover:bg-[#ffe040] text-[#0B1C2D] rounded-2xl font-black uppercase text-sm flex justify-center items-center gap-3 active:scale-95 disabled:opacity-50 transition-all shadow-lg shadow-[#FFD400]/25">
                 COMENZAR ENTREVISTA <ChevronRight size={18} />
               </button>
@@ -498,186 +465,78 @@ const App = () => {
           {/* STEP 3 — Acta final */}
           {step === 3 && (
             <div className="space-y-6 animate-in zoom-in duration-300">
-              <div id="printable-acta" className="bg-white p-6 text-slate-900 font-serif leading-tight border border-slate-300 shadow-lg rounded-sm flex flex-col justify-between" style={{ width: '210mm', minHeight: '277mm', margin: '0 auto', boxSizing: 'border-box' }}>
-                <div className="flex-1 flex flex-col justify-between">
-                  {/* Bloque Superior de Contenido */}
-                  <div className="space-y-3">
-                    {/* Header Institucional */}
-                    <div className="flex justify-between items-start border-b-2 border-slate-900 pb-1.5">
-                      <div className="space-y-0.5">
-                        <h2 className="text-2xl font-black uppercase tracking-tighter text-slate-900 leading-none">COMIF, R.L.</h2>
-                        <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-slate-500">Cooperativa de Ahorro y Crédito Integral</p>
-                        <p className="text-[8px] font-medium text-slate-400 italic">"Al servicio de nuestra comunidad"</p>
-                      </div>
-                      <div className="text-right space-y-0.5">
-                        <div className="bg-slate-900 text-white px-3 py-0.5 text-[9px] font-black uppercase tracking-widest rounded-sm">
-                          Acta de Resolución
-                        </div>
-                        <p className="font-mono text-[8px] uppercase font-bold pt-1">EXP: {aspirant.id?.replace(/(\d{4})(\d{5})(\d{4})/, '$1-$2-$3') || '---'}</p>
-                        <p className="font-mono text-[8px] uppercase font-bold">FECHA: {aspirant.date}</p>
-                      </div>
-                    </div>
-
-                    {/* Título Principal */}
-                    <div className="text-center py-0.5">
-                      <h3 className="text-base font-black uppercase underline underline-offset-4 decoration-2 tracking-widest text-[#0B1C2D]">Resolución de Ingreso y Admisión</h3>
-                    </div>
-
-                    {/* Datos del Aspirante */}
-                    <section className="space-y-0.5">
-                      <h5 className="text-[9px] font-black uppercase tracking-widest border-b border-slate-200 pb-0.5 flex items-center gap-1.5">
-                        <UserCheck size={10} className="text-slate-500" /> I. Información del Aspirante
-                      </h5>
-                      <div className="grid grid-cols-2 gap-2 bg-slate-50 p-2 rounded-sm border border-slate-100">
-                        <div>
-                          <p className="text-[7.5px] font-black uppercase text-slate-400">Nombre Completo</p>
-                          <p className="text-xs font-bold uppercase">{aspirant.name || '---'}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[7.5px] font-black uppercase text-slate-400">Resultado de Idoneidad (IS)</p>
-                          <p className="text-xs font-black text-slate-900">{finalIS.toFixed(2)} / 5.00</p>
-                        </div>
-                      </div>
-                    </section>
-
-                    {/* Considerandos Técnicos */}
-                    <section className="space-y-0.5">
-                      <h5 className="text-[9px] font-black uppercase tracking-widest border-b border-slate-200 pb-0.5 flex items-center gap-1.5">
-                        <BrainCircuit size={10} className="text-slate-500" /> II. Considerandos Técnicos y Análisis de Riesgo
-                      </h5>
-                      <div className="text-[8px] space-y-1 text-justify leading-relaxed">
-                        <p>
-                          Tras la aplicación de la Matriz de Inteligencia Social v19.0, se ha evaluado el perfil del aspirante considerando su trayectoria laboral, arraigo comunitario, perfil ético-financiero y relación con avalistas.
-                        </p>
-                        <div className="bg-slate-50 border-l-4 border-slate-900 p-2 font-bold text-slate-800 italic leading-snug">
-                          {autoReport.split('DILIGENCIA DE DATOS RECOPILADOS:')[0].replace('ANÁLISIS DE RIESGO OBJETIVO:', '').trim()}
-                        </div>
-                      </div>
-                    </section>
-
-                    {/* Diligencias de Campo */}
-                    <section className="space-y-0.5">
-                      <h5 className="text-[9px] font-black uppercase tracking-widest border-b border-slate-200 pb-0.5 flex items-center gap-1.5">
-                        <Briefcase size={10} className="text-slate-500" /> III. Diligencia de Datos y Referencias Verificadas
-                      </h5>
-                      <div className="overflow-hidden border border-slate-200 rounded-sm">
-                        <table className="w-full text-[7.5px] text-left border-collapse">
-                          <thead>
-                            <tr className="bg-slate-100 uppercase font-black text-slate-600">
-                              <th className="p-1 border-b border-slate-200">Tipo de Referencia / Entidad</th>
-                              <th className="p-1 border-b border-slate-200">Detalles de Contacto</th>
-                              <th className="p-1 border-b border-slate-200">Información Adicional</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {QUESTIONS_DB.filter(q => q.refLabel).map(q => {
-                              const data = refs[q.id];
-                              const isNoConsta = noConsta[q.id];
-                              if (isNoConsta) return (
-                                <tr key={q.id} style={{ pageBreakInside: 'avoid' }}>
-                                  <td className="p-0.5 font-bold uppercase text-[7px] leading-tight">{q.refLabel}</td>
-                                  <td colSpan="2" className="p-0.5 text-red-500 italic">No consta / Información no disponible</td>
-                                </tr>
-                              );
-                              
-                              const formatData = (item) => {
-                                if (q.refType === 'empresa') return {
-                                  main: item.empresa || '---',
-                                  contact: `${item.contacto || '---'} (${item.cargo || '---'})`,
-                                  tel: item.telefono || '---'
-                                };
-                                if (q.refType === 'contacto') return {
-                                  main: item.nombre || '---',
-                                  contact: `Rel: ${item.relacion || '---'}`,
-                                  tel: item.telefono || '---'
-                                };
-                                return { main: item || '---', contact: '---', tel: '---' };
-                              };
-
-                              const items = Array.isArray(data) ? data : [data];
-                              return items.map((item, idx) => {
-                                const info = formatData(item);
-                                return (
-                                  <tr key={`${q.id}-${idx}`} style={{ pageBreakInside: 'avoid' }}>
-                                    <td className="p-0.5 font-bold uppercase text-[7px] leading-tight">{idx === 0 ? q.refLabel : ''} {Array.isArray(data) ? `[Ref ${idx+1}]` : ''}</td>
-                                    <td className="p-0.5 leading-tight">
-                                      <div className="font-bold">{info.main}</div>
-                                      <div className="text-slate-500 text-[6.5px]">{info.contact}</div>
-                                    </td>
-                                    <td className="p-0.5 leading-tight">
-                                      <div className="flex items-center gap-1 font-mono text-[7px]"><Phone size={6} /> {info.tel}</div>
-                                    </td>
-                                  </tr>
-                                );
-                              });
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                      <div className="text-[7.5px] font-bold text-slate-600 italic">
-                        {autoReport.split('CONCLUSIÓN TÉCNICA:')[1] ? `CONCLUSIÓN TÉCNICA: ${autoReport.split('CONCLUSIÓN TÉCNICA:')[1].trim()}` : ''}
-                      </div>
-                    </section>
-
-                    {/* Apreciación del Auditor */}
-                    <section className="space-y-0.5">
-                      <h5 className="text-[9px] font-black uppercase tracking-widest border-b border-slate-200 pb-0.5 flex items-center gap-1.5">
-                        <MessageSquareQuote size={10} className="text-slate-500" /> IV. Apreciación General del Auditor
-                      </h5>
-                      <div className="p-2 bg-slate-50 border border-slate-100 text-[8.5px] font-medium italic text-slate-800 leading-normal min-h-[35px]">
-                        {auditorAppreciation || 'Sin observaciones adicionales registradas.'}
-                      </div>
-                    </section>
-
-                    {/* Dictamen Final */}
-                    <section className="pt-1">
-                      <div className="border border-slate-900 p-2 text-center space-y-0.5">
-                        <p className="text-[7.5px] font-black uppercase text-slate-400 tracking-[0.2em]">Dictamen Final de Admisión</p>
-                        <h4 className="text-lg font-black uppercase tracking-tighter leading-none">{zone.label}</h4>
-                        <div className="h-0.5 w-12 bg-slate-900 mx-auto mt-0.5"></div>
-                        <p className="text-[8.5px] font-bold uppercase pt-0.5 italic text-slate-600 leading-none">{zone.action}</p>
-                      </div>
-                    </section>
-                  </div>
-
-                  {/* Bloque Inferior: Firmas y Pie de Página */}
-                  <div className="pt-12 space-y-6">
-                    {/* Firmas */}
-                    <div className="grid grid-cols-2 gap-10 text-center">
-                      <div className="space-y-0.5">
-                        <div className="border-t border-slate-900 pt-2">
-                          <p className="font-black uppercase text-[8.5px] tracking-widest">{aspirant.evaluator || 'Firma Auditor'}</p>
-                          <p className="text-[6.5px] font-bold text-slate-400 uppercase">Analista de Riesgos</p>
-                        </div>
-                      </div>
-                      <div className="space-y-0.5">
-                        <div className="border-t border-slate-900 pt-2">
-                          <p className="font-black uppercase text-[8.5px] tracking-widest">Sello / Comité de Riesgos</p>
-                          <p className="text-[6.5px] font-bold text-slate-400 uppercase">Dirección de Admisiones</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Pie de página del Acta */}
-                    <div className="pt-2 text-center">
-                      <p className="text-[5.5px] text-slate-400 font-bold uppercase tracking-[0.4em]">Este documento es confidencial y propiedad exclusiva de COMIF, R.L. • v19.0</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <ActaImprimible 
+                aspirant={aspirant}
+                finalIS={finalIS}
+                autoReport={autoReport}
+                refs={refs}
+                noConsta={noConsta}
+                auditorAppreciation={auditorAppreciation}
+                zone={zone}
+              />
 
               <div className="flex flex-wrap gap-3 pb-12 px-2 print:hidden">
-                <button onClick={() => setStep(2)} className="flex-1 min-w-[120px] py-4 text-slate-400 font-black uppercase text-[10px] hover:bg-white rounded-2xl border-2 border-slate-100 hover:border-[#FFD400] hover:text-[#0B1C2D] transition-all">
+                <button onClick={() => { setStep(2); setGuardado(false); }} className="flex-1 min-w-[120px] py-4 text-slate-400 font-black uppercase text-[10px] hover:bg-white rounded-2xl border-2 border-slate-100 hover:border-[#FFD400] hover:text-[#0B1C2D] transition-all disabled:opacity-50" disabled={guardando}>
                   Editar Informe
                 </button>
-                <button onClick={() => window.print()} className="flex-[2] min-w-[200px] py-4 bg-[#0B1C2D] text-white rounded-2xl font-black uppercase text-[10px] shadow-lg shadow-[#0B1C2D]/20 flex items-center justify-center gap-2 hover:bg-[#1a2e3f] border-2 border-[#0B1C2D] hover:border-[#FFD400] transition-all">
-                  <Printer size={16} className="text-[#FFD400]" /> Imprimir / Guardar en PDF
+                <button 
+                  onClick={async () => {
+                    if (guardado || guardando) return;
+                    setGuardando(true);
+                    setSaveError('');
+                    await trackEvento('evaluacion_completada');
+                    const res = await registrarEvaluacion({ 
+                      aspiranteNombre: aspirant.name, 
+                      aspiranteDpi: aspirant.id, 
+                      analistaNombre: aspirant.evaluator, 
+                      indiceIdoneidad: parseFloat(finalIS.toFixed(2)), 
+                      zona: zone.label,
+                      detalles: {
+                        scores,
+                        refs,
+                        noConsta,
+                        finalIS,
+                        autoReport,
+                        auditorAppreciation,
+                        zone: { label: zone.label, color: zone.color, action: zone.action },
+                        aspirant
+                      }
+                    });
+                    if (res && res.error) {
+                      setSaveError(res.error);
+                      setGuardando(false);
+                      return;
+                    }
+                    setGuardando(false);
+                    setGuardado(true);
+                  }} 
+                  disabled={guardado || guardando}
+                  className={`flex-[2] min-w-[200px] py-4 rounded-2xl font-black uppercase text-[10px] flex items-center justify-center gap-2 transition-all ${
+                    guardado 
+                      ? 'bg-green-500 text-white border-2 border-green-500 shadow-lg shadow-green-500/20 cursor-default' 
+                      : 'bg-[#0B1C2D] text-white hover:bg-[#1a2e3f] border-2 border-[#0B1C2D] hover:border-[#FFD400] shadow-lg shadow-[#0B1C2D]/20 disabled:opacity-75'
+                  }`}
+                >
+                  {guardando ? (
+                    <><RefreshCcw size={16} className="text-[#FFD400] animate-spin" /> Guardando...</>
+                  ) : guardado ? (
+                    <><CheckCircle size={16} /> Guardado Exitosamente</>
+                  ) : (
+                    <><Save size={16} className="text-[#FFD400]" /> Guardar</>
+                  )}
                 </button>
                 <button onClick={resetEvaluation} className="w-full mt-6 py-5 bg-white border-2 border-red-100 text-red-600 rounded-[2rem] font-black uppercase text-xs shadow-sm flex items-center justify-center gap-3 hover:bg-red-50 hover:border-red-200 transition-all active:scale-95 group">
                   <RefreshCcw size={18} className="group-hover:rotate-180 transition-transform duration-700" />
                   Nueva evaluación de riesgo
                 </button>
               </div>
+
+              {saveError && (
+                <div className="mx-2 mb-12 p-4 bg-red-50 border-2 border-red-200 text-red-600 font-bold text-[11px] uppercase tracking-wide rounded-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
+                  <AlertTriangle size={20} className="shrink-0" />
+                  {saveError}
+                </div>
+              )}
             </div>
           )}
 
