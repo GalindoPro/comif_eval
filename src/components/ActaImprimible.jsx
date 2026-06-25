@@ -1,4 +1,3 @@
-import React from 'react';
 import { UserCheck, BrainCircuit, Briefcase, Phone, MessageSquareQuote } from 'lucide-react';
 import { QUESTIONS_DB } from '../lib/constants';
 
@@ -9,13 +8,14 @@ const ActaImprimible = ({
   refs = {}, 
   noConsta = {}, 
   auditorAppreciation = '', 
-  zone = {} 
+  zone = {},
+  adminStatus = null
 }) => {
   return (
-    <div id="printable-acta" className="bg-white p-6 text-slate-900 font-serif leading-tight border border-slate-300 shadow-lg rounded-sm flex flex-col justify-between" style={{ width: '210mm', minHeight: '277mm', margin: '0 auto', boxSizing: 'border-box' }}>
+    <div id="printable-acta" className="bg-white p-2 sm:p-4 text-slate-900 font-serif leading-tight border border-slate-300 shadow-lg rounded-sm flex flex-col justify-between w-full max-w-[210mm] h-full print:w-[210mm] print:min-h-[277mm] print:p-6 print:m-0 mx-auto" style={{ boxSizing: 'border-box' }}>
       <div className="flex-1 flex flex-col justify-between">
         {/* Bloque Superior de Contenido */}
-        <div className="space-y-3">
+        <div className="space-y-1.5 print:space-y-3">
           {/* Header Institucional */}
           <div className="flex justify-between items-start border-b-2 border-slate-900 pb-1.5">
             <div className="space-y-0.5">
@@ -138,7 +138,7 @@ const ActaImprimible = ({
             <h5 className="text-[9px] font-black uppercase tracking-widest border-b border-slate-200 pb-0.5 flex items-center gap-1.5">
               <MessageSquareQuote size={10} className="text-slate-500" /> IV. Apreciación General del Auditor
             </h5>
-            <div className="p-2 bg-slate-50 border border-slate-100 text-[8.5px] font-medium italic text-slate-800 leading-normal min-h-[35px]">
+            <div className="p-1 sm:p-2 bg-slate-50 border border-slate-100 text-[8.5px] font-medium italic text-slate-800 leading-normal min-h-[25px] print:min-h-[35px] print:p-2">
               {auditorAppreciation || 'Sin observaciones adicionales registradas.'}
             </div>
           </section>
@@ -155,7 +155,7 @@ const ActaImprimible = ({
         </div>
 
         {/* Bloque Inferior: Firmas y Pie de Página */}
-        <div className="pt-12 space-y-6">
+        <div className="pt-4 print:pt-12 space-y-4 print:space-y-6 shrink-0">
           {/* Firmas */}
           <div className="grid grid-cols-2 gap-10 text-center">
             <div className="space-y-0.5">
@@ -164,7 +164,15 @@ const ActaImprimible = ({
                 <p className="text-[6.5px] font-bold text-slate-400 uppercase">Analista de Riesgos</p>
               </div>
             </div>
-            <div className="space-y-0.5">
+            <div className="space-y-0.5 relative">
+              {adminStatus && (
+                <div className={`absolute bottom-8 left-1/2 -translate-x-1/2 w-fit px-4 py-1 sm:py-2 border-[3px] sm:border-[4px] rounded-lg transform -rotate-[15deg] opacity-80 pointer-events-none select-none
+                  ${adminStatus === 'aceptada' ? 'border-green-600 text-green-600' : 
+                    adminStatus === 'rechazada' ? 'border-red-600 text-red-600' : 
+                    'border-amber-500 text-amber-500'}`}>
+                  <p className="text-sm sm:text-lg font-black uppercase tracking-[0.2em]">{adminStatus.replace('_', ' ')}</p>
+                </div>
+              )}
               <div className="border-t border-slate-900 pt-2">
                 <p className="font-black uppercase text-[8.5px] tracking-widest">Sello / Comité de Riesgos</p>
                 <p className="text-[6.5px] font-bold text-slate-400 uppercase">Dirección de Admisiones</p>

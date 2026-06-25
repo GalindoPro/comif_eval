@@ -19,27 +19,55 @@ export async function trackEvento(tipoEvento) {
   }
 }
 
-export async function registrarEvaluacion({ aspiranteNombre, aspiranteDpi, analistaNombre, indiceIdoneidad, zona, detalles = {} }) {
+export async function verificarDpiExistente(dpi) {
   try {
-    // 1. Buscar si ya existe una evaluación con ese DPI
-    const { data: existentes, error: selectError } = await supabase
+    const { data, error } = await supabase
       .from('evaluaciones')
-      .select('id, estado')
-      .eq('aspirante_dpi', aspiranteDpi)
+      .select('id, estado, analista_nombre, detalles')
+      .eq('aspirante_dpi', dpi)
       .order('created_at', { ascending: false })
       .limit(1);
+    
+    if (error) throw error;
+    return data && data.length > 0 ? data[0] : null;
+  } catch (err) {
+    console.error('verificarDpiExistente falló:', err);
+    return null;
+  }
+}
 
-    if (selectError) throw selectError;
+export async function registrarEvaluacion({ aspiranteNombre, aspiranteDpi, analistaNombre, indiceIdoneidad, zona, detalles = {}, accion = 'auto', evalId = null }) {
+  try {
+    if (accion === 'auto') {
+      // 1. Buscar si ya existe una evaluación con ese DPI
+      const { data: existentes, error: selectError } = await supabase
+        .from('evaluaciones')
+        .select('id, estado, analista_nombre')
+        .eq('aspirante_dpi', aspiranteDpi)
+        .order('created_at', { ascending: false })
+        .limit(1);
 
-    if (existentes && existentes.length > 0) {
-      const evalExistente = existentes[0];
-      
-      // 2. Si ya fue procesada, bloquear
-      if (evalExistente.estado !== 'pendiente') {
-         return { error: 'El administrador ya evaluó esta solicitud (Aceptada/Rechazada). No se puede modificar.' };
+      if (selectError) throw selectError;
+
+      if (existentes && existentes.length > 0) {
+        const evalExistente = existentes[0];
+        
+        // 3. Verificamos el analista
+        if (evalExistente.analista_nombre?.toUpperCase() !== analistaNombre?.toUpperCase()) {
+           // Diferente analista -> Requiere confirmación
+           return { requiresConfirmation: true, existente: evalExistente };
+        } else {
+           // Mismo analista -> Actualización automática
+           accion = 'update';
+           evalId = evalExistente.id;
+        }
+      } else {
+        // No existe -> Inserción
+        accion = 'insert';
       }
-      
-      // 3. Si sigue en espera, actualizarla
+    }
+
+    if (accion === 'update' && evalId) {
       const { error: updateError } = await supabase
         .from('evaluaciones')
         .update({
@@ -47,14 +75,16 @@ export async function registrarEvaluacion({ aspiranteNombre, aspiranteDpi, anali
            analista_nombre: analistaNombre,
            indice_idoneidad: indiceIdoneidad,
            zona: zona,
-           detalles: detalles
+           detalles: detalles,
+           estado: 'pendiente'
         })
-        .eq('id', evalExistente.id);
+        .eq('id', evalId);
         
       if (updateError) throw updateError;
-      return { success: true, action: 'updated' };
-    } else {
-      // 4. Si no existe, insertar nueva
+      return { success: true, action: 'updated', message: 'Actualizada exitosamente.' };
+    } 
+    
+    if (accion === 'insert') {
       const { error: insertError } = await supabase
         .from('evaluaciones')
         .insert([{
@@ -68,7 +98,7 @@ export async function registrarEvaluacion({ aspiranteNombre, aspiranteDpi, anali
         }]);
         
       if (insertError) throw insertError;
-      return { success: true, action: 'inserted' };
+      return { success: true, action: 'inserted', message: 'Guardada exitosamente.' };
     }
   } catch (err) {
     console.error('registrarEvaluacion falló:', err);

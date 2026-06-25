@@ -14,3 +14,14 @@ The React Compiler is not enabled on this template because of its impact on dev 
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+
+## Mejoras Recientes
+
+- **Limpieza de código y resolución de advertencias de linter (ESLint):**
+  - Se eliminaron importaciones sin uso (iconos de `lucide-react` como `Briefcase`, `BrainCircuit`, `Users`, `TrendingUp`, `Phone`, y la importación de `React` en `ActaImprimible.jsx`).
+  - Se resolvieron advertencias sobre variables definidas pero no utilizadas, especialmente en bloques `catch` (usando la sintaxis moderna `catch { ... }` para evitar declarar variables de error innecesarias).
+  - Se añadió manejo de errores (logging) en bloques `catch` que anteriormente estaban vacíos (ej. en `PanelMetricas.jsx`).
+- **Optimización de React:**
+  - Se corrigieron actualizaciones de estado síncronas dentro de los hooks `useEffect` (ej. `setDraftData`, `setShowRecoveryModal`, `cargarDatos`) en `App.jsx` y `PanelMetricas.jsx` para seguir las mejores prácticas y prevenir renderizados en cascada innecesarios.
+- **Actualizaciones menores:**
+  - Se actualizó el año del pie de página a 2026.
