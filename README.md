@@ -25,3 +25,10 @@ If you are developing a production application, we recommend using TypeScript wi
   - Se corrigieron actualizaciones de estado síncronas dentro de los hooks `useEffect` (ej. `setDraftData`, `setShowRecoveryModal`, `cargarDatos`) en `App.jsx` y `PanelMetricas.jsx` para seguir las mejores prácticas y prevenir renderizados en cascada innecesarios.
 - **Actualizaciones menores:**
   - Se actualizó el año del pie de página a 2026.
+- **Prevención Inteligente de Duplicidad y Autocompletado:**
+  - **Detección temprana de DPI:** Al iniciar una evaluación, el sistema verifica en la base de datos si el DPI ya está registrado.
+  - **Lógica condicional por estado:** Si el expediente está "En Espera", permite cargar los datos para actualizar o iniciar un expediente nuevo. Si ya fue "Aceptado/Rechazado" por el administrador, bloquea la creación de expedientes nuevos y solo permite la actualización.
+  - **Autocompletado Mágico:** Al elegir "Cargar para Actualizar", el sistema rellena automáticamente todo el cuestionario y las calificaciones que el evaluador anterior había guardado.
+  - **Reinicio automático de estado:** Si se actualiza un expediente que ya había sido "Aceptado" o "Rechazado", el sistema lo regresa automáticamente al estado "En Espera" para que el administrador sea notificado y lo vuelva a evaluar.
+- **Panel Administrativo (Mejoras UI/UX):**
+  - **Buscador en Tiempo Real:** Se incorporó una barra de búsqueda inteligente en la pestaña de solicitudes que permite filtrar instantáneamente expedientes escribiendo el nombre del asociado o su número de DPI, combinable con los filtros de estado (Total, En Espera, Aceptadas, Rechazadas).
