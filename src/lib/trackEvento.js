@@ -21,6 +21,9 @@ export async function trackEvento(tipoEvento) {
 
 export async function verificarDpiExistente(dpi) {
   try {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return null;
+    }
     const { data, error } = await supabase
       .from('evaluaciones')
       .select('id, estado, analista_nombre, detalles')
@@ -38,6 +41,9 @@ export async function verificarDpiExistente(dpi) {
 
 export async function registrarEvaluacion({ aspiranteNombre, aspiranteDpi, analistaNombre, indiceIdoneidad, zona, detalles = {}, accion = 'auto', evalId = null }) {
   try {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return { isOffline: true, error: 'Sin conexión a internet.' };
+    }
     if (accion === 'auto') {
       // 1. Buscar si ya existe una evaluación con ese DPI
       const { data: existentes, error: selectError } = await supabase
@@ -102,6 +108,15 @@ export async function registrarEvaluacion({ aspiranteNombre, aspiranteDpi, anali
     }
   } catch (err) {
     console.error('registrarEvaluacion falló:', err);
-    return { error: err.message || 'Error de conexión al guardar.' };
+    const msg = err.message || '';
+    const isNetwork = (typeof navigator !== 'undefined' && !navigator.onLine) || 
+                      msg.toLowerCase().includes('fetch') || 
+                      msg.toLowerCase().includes('network') || 
+                      msg.toLowerCase().includes('connection') || 
+                      msg.toLowerCase().includes('load failed');
+    return { 
+      error: msg || 'Error de conexión al guardar.',
+      isOffline: isNetwork
+    };
   }
 }

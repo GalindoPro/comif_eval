@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import PanelMetricas from './components/PanelMetricas';
 import ActaImprimible from './components/ActaImprimible';
 import { trackEvento, registrarEvaluacion, verificarDpiExistente } from './lib/trackEvento';
+import { getOfflineQueue, addToOfflineQueue, syncOfflineQueue } from './lib/offlineQueue';
 import {
   UserCheck, FileText, AlertTriangle, CheckCircle, ShieldCheck,
   Printer, ChevronRight, ChevronLeft, Search, ArrowRight,
@@ -50,6 +51,37 @@ const App = () => {
   const [startConflictData, setStartConflictData] = useState(null);
   const [evalIdToUpdate, setEvalIdToUpdate] = useState(null);
   const [verificandoDpi, setVerificandoDpi] = useState(false);
+
+  const [offlineQueue, setOfflineQueue] = useState(() => getOfflineQueue());
+  const [syncingOffline, setSyncingOffline] = useState(false);
+  const [offlineSyncMessage, setOfflineSyncMessage] = useState('');
+  const [offlineSavedAlert, setOfflineSavedAlert] = useState(false);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      if (getOfflineQueue().length > 0 && !syncingOffline) {
+        handleSyncOffline();
+      }
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [syncingOffline]);
+
+  const handleSyncOffline = async () => {
+    if (syncingOffline || getOfflineQueue().length === 0) return;
+    setSyncingOffline(true);
+    setOfflineSyncMessage('Sincronizando expedientes pendientes...');
+    const result = await syncOfflineQueue();
+    setOfflineQueue(result.remaining);
+    setSyncingOffline(false);
+    if (result.syncedCount > 0) {
+      setOfflineSyncMessage(`✅ ¡Sincronización exitosa! Se subieron ${result.syncedCount} expedientes a Supabase.`);
+      setTimeout(() => setOfflineSyncMessage(''), 6000);
+    } else if (result.failedCount > 0) {
+      setOfflineSyncMessage(`⚠️ No se pudieron sincronizar ${result.failedCount} expedientes. Revisa tu conexión.`);
+      setTimeout(() => setOfflineSyncMessage(''), 6000);
+    }
+  };
 
 
   const handleIdChange = (e) => {
@@ -230,6 +262,7 @@ const App = () => {
     setDpiConflictData(null);
     setStartConflictData(null);
     setEvalIdToUpdate(null);
+    setOfflineSavedAlert(false);
     setStep(0);
   };
 
@@ -285,6 +318,27 @@ const App = () => {
       accion: finalAccion,
       evalId: finalEvalId
     });
+
+    if (res && res.isOffline) {
+      const updatedQueue = addToOfflineQueue({
+        aspirant: { ...aspirant },
+        payload: {
+          aspiranteNombre: aspirant.name, 
+          aspiranteDpi: aspirant.id, 
+          analistaNombre: aspirant.evaluator, 
+          indiceIdoneidad: parseFloat(finalIS.toFixed(2)), 
+          zona: zone.label,
+          detalles: { scores, refs, noConsta, finalIS, autoReport, auditorAppreciation, zone: { label: zone.label, color: zone.color, action: zone.action }, aspirant },
+          accion: finalAccion,
+          evalId: finalEvalId
+        }
+      });
+      setOfflineQueue(updatedQueue);
+      setOfflineSavedAlert(true);
+      setGuardando(false);
+      setGuardado(true);
+      return;
+    }
 
     if (res && res.requiresConfirmation) {
       setDpiConflictData(res.existente);
@@ -495,6 +549,30 @@ const App = () => {
           </button>
           <ShieldCheck className="text-[#FFD400]" size={18} />
         </header>
+
+        {/* Banner de Sincronización Offline */}
+        {(offlineQueue.length > 0 || offlineSyncMessage) && (
+          <div className="bg-amber-400 text-[#0B1C2D] px-4 py-2.5 flex flex-col sm:flex-row justify-between items-center gap-2 font-bold text-xs shadow-inner animate-in slide-in-from-top duration-300">
+            <div className="flex items-center gap-2">
+              <span className="text-base">☁️</span>
+              <div>
+                {offlineSyncMessage ? (
+                  <span>{offlineSyncMessage}</span>
+                ) : (
+                  <span><strong>Bandeja Offline:</strong> Tienes {offlineQueue.length} {offlineQueue.length === 1 ? 'expediente guardado sin conexión listo' : 'expedientes guardados sin conexión listos'} para subir.</span>
+                )}
+              </div>
+            </div>
+            {offlineQueue.length > 0 && !syncingOffline && (
+              <button
+                onClick={handleSyncOffline}
+                className="bg-[#0B1C2D] text-[#FFD400] hover:bg-slate-800 px-3 py-1.5 rounded-lg text-[10px] uppercase font-black tracking-wider transition-all shadow active:scale-95 flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCcw size={12} className={syncingOffline ? 'animate-spin' : ''} /> Sincronizar Ahora
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Progress bar */}
         <div className="bg-slate-200 h-1 w-full shrink-0">
@@ -785,7 +863,7 @@ const App = () => {
                   {guardando ? (
                     <><RefreshCcw size={14} className="text-[#FFD400] animate-spin" /> Guardando</>
                   ) : guardado ? (
-                    <><CheckCircle size={14} /> Guardado</>
+                    <><CheckCircle size={14} /> {offlineSavedAlert ? 'En Cola Offline' : 'Guardado'}</>
                   ) : (
                     <><Save size={14} className="text-[#FFD400]" /> Guardar</>
                   )}
@@ -797,9 +875,16 @@ const App = () => {
               </div>
 
               {saveError && (
-                <div className="mx-2 mb-4 p-3 bg-red-50 border-2 border-red-200 text-red-600 font-bold text-[10px] uppercase tracking-wide rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
+                <div className="mx-2 mb-2 p-3 bg-red-50 border-2 border-red-200 text-red-600 font-bold text-[10px] uppercase tracking-wide rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2">
                   <AlertTriangle size={16} className="shrink-0" />
-                  {saveError}
+                  <span>{saveError}</span>
+                </div>
+              )}
+
+              {offlineSavedAlert && (
+                <div className="mx-2 mt-2 p-3 bg-amber-50 border-2 border-amber-300 text-[#0B1C2D] font-bold text-[10px] uppercase tracking-wide rounded-xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
+                  <span className="text-base">☁️</span>
+                  <span><strong>¡Guardado en Bandeja Offline!</strong> Estás sin conexión o hubo un fallo de red. El expediente se guardó de forma segura en tu carpeta pendiente. Puedes presionar <strong>"Nueva Eval."</strong> para evaluar a otra persona sin perder nada.</span>
                 </div>
               )}
             </div>
@@ -811,7 +896,6 @@ const App = () => {
           SISTEMA DE FILTRO ANALÓGICO COMIF • MATRIZ OBJETIVA DE RIESGOS • 2026
         </footer>
       </div>
-
 
     </div>
   );

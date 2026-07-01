@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { obtenerMetricasPorHora, obtenerMetricasPorDia } from '../lib/metricas';
 import { obtenerEvaluaciones, actualizarEstado } from '../lib/evaluaciones';
+import { getAdminCache, setAdminCache, updateItemInAdminCache, getAdminQueue, addToAdminQueue, syncAdminQueue } from '../lib/adminOffline';
 import { ShieldCheck, RefreshCcw, ChevronRight, CheckCircle, Clock, XCircle, FileText, BarChart3, Search, PlayCircle, Printer } from 'lucide-react';
 import ActaImprimible from './ActaImprimible';
 import { supabase } from '../lib/supabaseClient';
@@ -25,6 +26,11 @@ const PanelMetricas = () => {
   const [metricas, setMetricas] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   
+  const [adminQueue, setAdminQueue] = useState(() => getAdminQueue());
+  const [modoOfflineCache, setModoOfflineCache] = useState(() => getAdminCache().length > 0 && typeof navigator !== 'undefined' && !navigator.onLine);
+  const [syncingAdmin, setSyncingAdmin] = useState(false);
+  const [adminSyncMessage, setAdminSyncMessage] = useState('');
+  
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState(null);
   const [claveError, setClaveError] = useState(false);
@@ -43,9 +49,14 @@ const PanelMetricas = () => {
     setCargando(true);
     setError(null);
     try {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error('offline');
+      }
       if (vistaPrincipal === 'evaluaciones') {
         const data = await obtenerEvaluaciones();
         setEvaluaciones(data || []);
+        setAdminCache(data || []);
+        setModoOfflineCache(false);
       } else {
         const resultado = vistaMetricas === 'hora'
           ? await obtenerMetricasPorHora()
@@ -53,7 +64,19 @@ const PanelMetricas = () => {
         setMetricas(resultado || []);
       }
     } catch (err) {
-      setError(err.message || 'Error al cargar los datos.');
+      const isNetwork = (typeof navigator !== 'undefined' && !navigator.onLine) || err.message === 'offline' || err.message?.toLowerCase().includes('fetch') || err.message?.toLowerCase().includes('network') || err.message?.toLowerCase().includes('connection') || err.message?.toLowerCase().includes('load failed');
+      if (vistaPrincipal === 'evaluaciones' && (isNetwork || getAdminCache().length > 0)) {
+        const cache = getAdminCache();
+        if (cache.length > 0) {
+          setEvaluaciones(cache);
+          setModoOfflineCache(true);
+          setError(null);
+        } else {
+          setError('Sin conexión a internet y no hay datos en caché local.');
+        }
+      } else {
+        setError(err.message || 'Error al cargar los datos.');
+      }
     } finally {
       setCargando(false);
     }
@@ -78,14 +101,56 @@ const PanelMetricas = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autenticado, vistaPrincipal, vistaMetricas]);
 
+  useEffect(() => {
+    const handleOnline = () => {
+      if (getAdminQueue().length > 0 && !syncingAdmin) {
+        handleSyncAdmin();
+      } else if (modoOfflineCache) {
+        cargarDatos();
+      }
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [syncingAdmin, modoOfflineCache]);
+
+  const handleSyncAdmin = async () => {
+    if (syncingAdmin || getAdminQueue().length === 0) return;
+    setSyncingAdmin(true);
+    setAdminSyncMessage('Sincronizando resoluciones pendientes...');
+    const result = await syncAdminQueue();
+    setAdminQueue(result.remaining);
+    setSyncingAdmin(false);
+    if (result.syncedCount > 0) {
+      setAdminSyncMessage(`✅ ¡Se subieron ${result.syncedCount} resoluciones a Supabase!`);
+      await cargarDatos();
+      setTimeout(() => setAdminSyncMessage(''), 6000);
+    } else if (result.failedCount > 0) {
+      setAdminSyncMessage(`⚠️ No se pudieron sincronizar ${result.failedCount} resoluciones.`);
+      setTimeout(() => setAdminSyncMessage(''), 6000);
+    }
+  };
+
   const handleCambiarEstado = async (id, nuevoEstado) => {
     try {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        throw new Error('offline');
+      }
       Promise.resolve().then(() => setCargando(true));
       await actualizarEstado(id, nuevoEstado);
       await cargarDatos(); // Recargar para ver los cambios
     } catch (err) {
-      setError('Error al actualizar estado: ' + err.message);
-      setCargando(false);
+      const isNetwork = (typeof navigator !== 'undefined' && !navigator.onLine) || err.message === 'offline' || err.message?.toLowerCase().includes('fetch') || err.message?.toLowerCase().includes('network') || err.message?.toLowerCase().includes('connection') || err.message?.toLowerCase().includes('load failed');
+      if (isNetwork) {
+        const updatedQueue = addToAdminQueue(id, nuevoEstado);
+        const updatedCache = updateItemInAdminCache(id, nuevoEstado);
+        setEvaluaciones(updatedCache);
+        setAdminQueue(updatedQueue);
+        setModoOfflineCache(true);
+        setCargando(false);
+      } else {
+        setError('Error al actualizar estado: ' + err.message);
+        setCargando(false);
+      }
     }
   };
 
@@ -197,6 +262,32 @@ const PanelMetricas = () => {
             </button>
           </div>
         </header>
+
+        {/* Banner de Modo Caché / Cola Offline Admin */}
+        {(modoOfflineCache || adminQueue.length > 0 || adminSyncMessage) && (
+          <div className="bg-amber-400 text-[#0B1C2D] px-4 py-2.5 flex flex-col sm:flex-row justify-between items-center gap-2 font-bold text-xs shadow-inner animate-in slide-in-from-top duration-300">
+            <div className="flex items-center gap-2">
+              <span className="text-base">☁️</span>
+              <div>
+                {adminSyncMessage ? (
+                  <span>{adminSyncMessage}</span>
+                ) : (
+                  <span>
+                    <strong>{modoOfflineCache ? 'Modo Caché Offline:' : 'Bandeja de Resoluciones:'}</strong> {modoOfflineCache ? 'Mostrando historial local guardado en tu equipo.' : ''} {adminQueue.length > 0 ? `Tienes ${adminQueue.length} ${adminQueue.length === 1 ? 'resolución pendiente' : 'resoluciones pendientes'} de subir.` : ''}
+                  </span>
+                )}
+              </div>
+            </div>
+            {adminQueue.length > 0 && !syncingAdmin && (
+              <button
+                onClick={handleSyncAdmin}
+                className="bg-[#0B1C2D] text-[#FFD400] hover:bg-slate-800 px-3 py-1.5 rounded-lg text-[10px] uppercase font-black tracking-wider transition-all shadow active:scale-95 flex items-center gap-1.5 cursor-pointer shrink-0"
+              >
+                <RefreshCcw size={12} className={syncingAdmin ? 'animate-spin' : ''} /> Sincronizar Ahora
+              </button>
+            )}
+          </div>
+        )}
 
         <main className="p-3 sm:p-4 md:p-6 flex-1 overflow-y-auto space-y-4 sm:space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-100 pb-3 sm:pb-4 gap-2 sm:gap-0">

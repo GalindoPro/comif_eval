@@ -32,3 +32,6 @@ If you are developing a production application, we recommend using TypeScript wi
   - **Reinicio automático de estado:** Si se actualiza un expediente que ya había sido "Aceptado" o "Rechazado", el sistema lo regresa automáticamente al estado "En Espera" para que el administrador sea notificado y lo vuelva a evaluar.
 - **Panel Administrativo (Mejoras UI/UX):**
   - **Buscador en Tiempo Real:** Se incorporó una barra de búsqueda inteligente en la pestaña de solicitudes que permite filtrar instantáneamente expedientes escribiendo el nombre del asociado o su número de DPI, combinable con los filtros de estado (Total, En Espera, Aceptadas, Rechazadas).
+- **Operación 100% Offline (Campo y Administración):**
+  - **Bandeja de Salida Offline (Auditores en Campo):** Si el auditor guarda una evaluación sin señal de internet, el expediente se almacena en una cola local segura sin mostrar errores, permitiendo iniciar nuevas evaluaciones inmediatamente.
+  - **Memoria Caché y Cola de Resoluciones (Administrador):** El panel de administración almacena en caché las solicitudes descargadas para permitir revisiones y consulta de actas sin internet. Los cambios de estado (Aceptar/Rechazar) en modo offline se encolan localmente y se sincronizan en cuanto regresa la conexión.
