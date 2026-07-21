@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import PanelMetricas from './components/PanelMetricas';
 import ActaImprimible from './components/ActaImprimible';
 import { trackEvento, registrarEvaluacion, verificarDpiExistente } from './lib/trackEvento';
@@ -57,17 +57,7 @@ const App = () => {
   const [offlineSyncMessage, setOfflineSyncMessage] = useState('');
   const [offlineSavedAlert, setOfflineSavedAlert] = useState(false);
 
-  useEffect(() => {
-    const handleOnline = () => {
-      if (getOfflineQueue().length > 0 && !syncingOffline) {
-        handleSyncOffline();
-      }
-    };
-    window.addEventListener('online', handleOnline);
-    return () => window.removeEventListener('online', handleOnline);
-  }, [syncingOffline]);
-
-  const handleSyncOffline = async () => {
+  const handleSyncOffline = useCallback(async () => {
     if (syncingOffline || getOfflineQueue().length === 0) return;
     setSyncingOffline(true);
     setOfflineSyncMessage('Sincronizando expedientes pendientes...');
@@ -81,7 +71,17 @@ const App = () => {
       setOfflineSyncMessage(`⚠️ No se pudieron sincronizar ${result.failedCount} expedientes. Revisa tu conexión.`);
       setTimeout(() => setOfflineSyncMessage(''), 6000);
     }
-  };
+  }, [syncingOffline]);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      if (getOfflineQueue().length > 0 && !syncingOffline) {
+        handleSyncOffline();
+      }
+    };
+    window.addEventListener('online', handleOnline);
+    return () => window.removeEventListener('online', handleOnline);
+  }, [syncingOffline, handleSyncOffline]);
 
 
   const handleIdChange = (e) => {
@@ -378,18 +378,29 @@ const App = () => {
   }, [scores, refs, currentQuestion, noConsta]);
 
   const handleNext = () => {
-    if (currentQIndex < 29) setCurrentQIndex(prev => prev + 1);
+    if (currentQIndex < QUESTIONS_DB.length - 1) setCurrentQIndex(prev => prev + 1);
     else setStep(2);
   };
 
   const updateRefField = (qId, field, value, index = null) => {
+    let finalValue = value;
+    if (field === 'telefono') {
+      const numbers = value.replace(/\D/g, '');
+      if (numbers.length > 8) return;
+      if (numbers.length > 4) {
+        finalValue = `${numbers.slice(0, 4)}-${numbers.slice(4)}`;
+      } else {
+        finalValue = numbers;
+      }
+    }
+
     setRefs(prev => {
       if (index !== null) {
         const newList = [...prev[qId]];
-        newList[index] = { ...newList[index], [field]: value };
+        newList[index] = { ...newList[index], [field]: finalValue };
         return { ...prev, [qId]: newList };
       }
-      return { ...prev, [qId]: typeof prev[qId] === 'object' ? { ...prev[qId], [field]: value } : value };
+      return { ...prev, [qId]: typeof prev[qId] === 'object' ? { ...prev[qId], [field]: finalValue } : finalValue };
     });
   };
 
@@ -645,7 +656,7 @@ const App = () => {
               <div className="flex items-center gap-2 bg-[#0B1C2D] text-white p-2 sm:p-3 rounded-xl shrink-0 shadow-md border-b-2 border-[#FFD400]">
                 <div className="p-1.5 sm:p-2 bg-[#10B981] rounded-lg text-white">{currentCategory.icon}</div>
                 <h3 className="text-[10px] sm:text-[11px] font-black uppercase tracking-tight">{currentCategory.title}</h3>
-                <div className="ml-auto font-mono text-[9px] sm:text-[10px] text-[#FFD400] font-bold">{currentQIndex + 1}/30</div>
+                <div className="ml-auto font-mono text-[9px] sm:text-[10px] text-[#FFD400] font-bold">{currentQIndex + 1}/{QUESTIONS_DB.length}</div>
               </div>
 
               <div className="bg-white border-2 border-slate-50 rounded-2xl p-2 sm:p-4 flex-1 flex flex-col justify-center gap-2 sm:gap-4 overflow-y-auto">
@@ -737,7 +748,7 @@ const App = () => {
                       onClick={() => {
                         setScores({ ...scores, [currentQuestion.id]: opt.val });
                         if (!currentQuestion.refLabel) {
-                          if (currentQIndex < 29) setCurrentQIndex(prev => prev + 1);
+                          if (currentQIndex < QUESTIONS_DB.length - 1) setCurrentQIndex(prev => prev + 1);
                           else setStep(2);
                         }
                       }}
