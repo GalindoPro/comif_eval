@@ -834,10 +834,16 @@ const App = () => {
                 </div>
               </div>
 
-              <button disabled={!auditorAppreciation.trim()} onClick={() => setStep(3)}
-                className={`w-full py-3 shrink-0 rounded-xl font-black uppercase text-xs shadow-md flex justify-center items-center gap-2 transition-all ${auditorAppreciation.trim() ? 'bg-[#0B1C2D] text-white hover:bg-[#1a2e3f] shadow-lg shadow-[#0B1C2D]/20' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
-                CONSOLIDAR ACTA OFICIAL <ArrowRight size={14} />
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2 shrink-0 mt-2">
+                <button onClick={() => setStep(1)}
+                  className="sm:w-1/3 py-3 rounded-xl font-black uppercase text-xs shadow-sm flex justify-center items-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all border-2 border-slate-200 active:scale-95">
+                  <ChevronLeft size={14} /> VOLVER A PREGUNTAS
+                </button>
+                <button disabled={!auditorAppreciation.trim()} onClick={() => setStep(3)}
+                  className={`sm:w-2/3 py-3 rounded-xl font-black uppercase text-xs shadow-md flex justify-center items-center gap-2 transition-all ${auditorAppreciation.trim() ? 'bg-[#0B1C2D] text-white hover:bg-[#1a2e3f] shadow-lg shadow-[#0B1C2D]/20 active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+                  CONSOLIDAR ACTA OFICIAL <ArrowRight size={14} />
+                </button>
+              </div>
             </div>
           )}
 
